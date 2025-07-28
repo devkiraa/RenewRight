@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "685682193957",
+    "project_id": "insurancemanager01",
+    "storage_bucket": "insurancemanager01.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:685682193957:android:3c675e0deed1dd8dc871cc",
+        "android_client_info": {
+          "package_name": "com.example.csc_insurance_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkynvN0k05kL6g8sTZETkZ204NJq8q6hg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
