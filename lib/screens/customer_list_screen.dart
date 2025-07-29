@@ -1,5 +1,6 @@
 // lib/screens/customer_list_screen.dart
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart'; // NEW: Import package
 import '../models/customer_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
@@ -22,15 +23,44 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   String _searchQuery = '';
   String? _currentUserRole;
 
+  // NEW: Ad State Variables
+  BannerAd? _bannerAd;
+  bool _isBannerAdReady = false;
+
   @override
   void initState() {
     super.initState();
+    _loadBannerAd(); // Load the ad
     _fetchUserRole();
     _searchController.addListener(() {
       if (mounted) setState(() => _searchQuery = _searchController.text);
     });
   }
   
+  // NEW: Function to load the banner ad
+  void _loadBannerAd() {
+    // IMPORTANT: Replace this with your own Ad Unit ID from AdMob
+    final adUnitId = 'ca-app-pub-7451304293352412/2801466658';
+
+    _bannerAd = BannerAd(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      size: AdSize.banner,
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          setState(() {
+            _isBannerAdReady = true;
+          });
+        },
+        onAdFailedToLoad: (ad, err) {
+          print('Failed to load a banner ad: ${err.message}');
+          _isBannerAdReady = false;
+          ad.dispose();
+        },
+      ),
+    )..load();
+  }
+
   void _fetchUserRole() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
@@ -42,6 +72,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _bannerAd?.dispose(); // UPDATED: Dispose the ad
     super.dispose();
   }
   
@@ -160,6 +191,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               },
             ),
           ),
+          // NEW: Ad container at the bottom
+          if (_isBannerAdReady)
+            SizedBox(
+              width: _bannerAd!.size.width.toDouble(),
+              height: _bannerAd!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerAd!),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
