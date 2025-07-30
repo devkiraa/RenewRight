@@ -35,32 +35,12 @@ RenewRight is a mobile application built with Flutter, designed to help insuranc
 
 You can download and install the latest version of the app from the **Releases** section of this GitHub page.
 
-1.  Go to the [**Releases Page**](https://github.com/YOUR_USERNAME/RenewRight-App/releases). *(**Note**: You need to replace `YOUR_USERNAME` with your actual GitHub username)*.
+1.  Go to the [**Releases Page**](https://github.com/devkiraa/RenewRight/releases).
 2.  Under the latest release (e.g., `v1.0.0`), click on the `app-release.apk` file to download it.
 3.  Once downloaded, open the file on your Android phone to install it.
 4.  You may need to allow installations from "unknown sources" in your phone's security settings.
 
 ---
-## 💻 How to Run (for Developers)
-
-If you want to run the project yourself, follow these steps:
-
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/YOUR_USERNAME/RenewRight-App.git](https://github.com/YOUR_USERNAME/RenewRight-App.git)
-    ```
-2.  **Set up Firebase:**
-    * Create a new Firebase project.
-    * Set up an Android app in the project and download the `google-services.json` file.
-    * Place the `google-services.json` file in the `android/app/` directory.
-3.  **Install dependencies:**
-    ```bash
-    flutter pub get
-    ```
-4.  **Run the app:**
-    ```bash
-    flutter run
-    ```
 
 ---
 ## 📄 License
