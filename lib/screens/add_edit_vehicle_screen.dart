@@ -6,25 +6,49 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/customer_model.dart';
 import '../models/vehicle_model.dart';
 import '../services/firestore_service.dart';
-import 'image_viewer_screen.dart'; // Import the image viewer screen
+import 'image_viewer_screen.dart';
 
-// The custom formatter class
+// A robust formatter for all Indian vehicle number formats
 class VehicleNumberFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     final text = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
-    var formattedText = '';
-    
-    if (text.length <= 2) {
-      formattedText = text;
-    } else if (text.length <= 4) {
-      formattedText = '${text.substring(0, 2)}-${text.substring(2)}';
-    } else {
-      formattedText = '${text.substring(0, 2)}-${text.substring(2, 4)}-${text.substring(4, text.length > 8 ? 8 : text.length)}';
-    }
+    final buffer = StringBuffer();
 
+    // Check if it's a BH-series plate
+    if (text.startsWith(RegExp(r'\d{2}BH'))) {
+      for (int i = 0; i < text.length; i++) {
+        buffer.write(text[i]);
+        if (i == 1) buffer.write('-'); // XX-
+        if (i == 3) buffer.write('-'); // XX-BH-
+        if (i == 7) buffer.write('-'); // XX-BH-NNNN-
+      }
+    } else { // Handle standard plates
+      int? seriesEndIndex;
+      if (text.length > 4) {
+        for (int i = 4; i < text.length; i++) {
+          if (RegExp(r'[0-9]').hasMatch(text[i])) {
+            seriesEndIndex = i;
+            break;
+          }
+        }
+      }
+
+      for (int i = 0; i < text.length; i++) {
+        buffer.write(text[i]);
+        if (i == 1 && text.length > 2) buffer.write('-');
+        if (i == 3 && text.length > 4) buffer.write('-');
+        if (seriesEndIndex != null && i == seriesEndIndex - 1 && i > 3) buffer.write('-');
+      }
+    }
+    
+    var formattedText = buffer.toString();
     return TextEditingValue(
       text: formattedText,
       selection: TextSelection.collapsed(offset: formattedText.length),
@@ -34,10 +58,10 @@ class VehicleNumberFormatter extends TextInputFormatter {
 
 
 class AddEditVehicleScreen extends StatefulWidget {
-  final String customerId;
+  final Customer customer;
   final Vehicle? vehicle;
 
-  const AddEditVehicleScreen({super.key, required this.customerId, this.vehicle});
+  const AddEditVehicleScreen({super.key, required this.customer, this.vehicle});
 
   @override
   State<AddEditVehicleScreen> createState() => _AddEditVehicleScreenState();
@@ -116,14 +140,26 @@ class _AddEditVehicleScreenState extends State<AddEditVehicleScreen> {
     
     if (_isEditMode) {
       final vehicleDataMap = {
-        'vehicleNumber': _vehicleNumberController.text, 'vehicleType': _selectedVehicleType!, 'insuranceStartDate': Timestamp.fromDate(_insuranceStartDate!),
-        'insurancePeriod': _selectedInsurancePeriod!, 'dueDate': Timestamp.fromDate(_calculatedDueDate!), 'photos': _photoBase64Map,
+        'customerName': widget.customer.name,
+        'vehicleNumber': _vehicleNumberController.text, 
+        'vehicleType': _selectedVehicleType!, 
+        'insuranceStartDate': Timestamp.fromDate(_insuranceStartDate!),
+        'insurancePeriod': _selectedInsurancePeriod!, 
+        'dueDate': Timestamp.fromDate(_calculatedDueDate!), 
+        'photos': _photoBase64Map,
       };
       await _firestoreService.updateVehicle(widget.vehicle!.id, vehicleDataMap);
     } else {
       final newVehicle = Vehicle(
-        id: '', customerId: widget.customerId, vehicleNumber: _vehicleNumberController.text, vehicleType: _selectedVehicleType!,
-        insuranceStartDate: _insuranceStartDate!, insurancePeriod: _selectedInsurancePeriod!, dueDate: _calculatedDueDate!, photos: _photoBase64Map,
+        id: '', 
+        customerId: widget.customer.id, 
+        customerName: widget.customer.name,
+        vehicleNumber: _vehicleNumberController.text, 
+        vehicleType: _selectedVehicleType!,
+        insuranceStartDate: _insuranceStartDate!, 
+        insurancePeriod: _selectedInsurancePeriod!, 
+        dueDate: _calculatedDueDate!, 
+        photos: _photoBase64Map,
       );
       await _firestoreService.addVehicle(newVehicle);
     }
@@ -162,7 +198,10 @@ class _AddEditVehicleScreenState extends State<AddEditVehicleScreen> {
                             controller: _vehicleNumberController,
                             decoration: const InputDecoration(labelText: 'Vehicle Number', prefixIcon: Icon(Icons.pin_outlined), border: OutlineInputBorder()),
                             textCapitalization: TextCapitalization.characters,
-                            inputFormatters: [ FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9-]')), VehicleNumberFormatter()],
+                            inputFormatters: [
+                              LengthLimitingTextInputFormatter(15),
+                              VehicleNumberFormatter(),
+                            ],
                             validator: (v) => v!.isEmpty ? 'Required' : null,
                           ),
                           const SizedBox(height: 16),
@@ -229,7 +268,6 @@ class _AddEditVehicleScreenState extends State<AddEditVehicleScreen> {
                           ),
                           if (_photoBase64Map.isNotEmpty) ...[
                             const Divider(height: 24),
-                            // UPDATED: The ListTile is now tappable
                             ..._photoBase64Map.entries.map((entry) => ListTile(
                               leading: Image.memory(base64Decode(entry.value), width: 40, height: 40, fit: BoxFit.cover),
                               title: Text(entry.key),

@@ -146,4 +146,17 @@ class FirestoreService {
       rethrow;
     }
   }
+  // NEW: Fetches vehicles due for renewal within a specific number of days
+  Stream<List<Vehicle>> getUrgentRenewals({int days = 10}) {
+    final now = DateTime.now();
+    final cutoffDate = now.add(Duration(days: days));
+    return _db
+        .collection('vehicles')
+        .where('dueDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
+        .where('dueDate', isLessThanOrEqualTo: Timestamp.fromDate(cutoffDate))
+        .orderBy('dueDate')
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Vehicle.fromFirestore(doc)).toList());
+  }
 }

@@ -30,11 +30,18 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
   Color _getDueDateColor(DateTime dueDate) {
     final now = DateTime.now();
-    if (now.year == dueDate.year && now.month == dueDate.month && now.day == dueDate.day) return Colors.orange.shade700;
-    final difference = dueDate.difference(now).inDays;
-    if (difference < 0) return Colors.red.shade700;
-    if (difference < 30) return Colors.orange.shade700;
-    return Colors.green.shade700;
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+
+    if (dueDay.isBefore(today)) {
+      return Colors.red.shade700; // Overdue
+    }
+    final difference = dueDay.difference(today).inDays;
+    if (difference < 30) {
+      return Colors.orange.shade700; // Due soon
+    } else {
+      return Colors.green.shade700; // Safe
+    }
   }
 
   void _sendWhatsAppMessage(String phone, String vehicleNumber, DateTime dueDate) async {
@@ -47,7 +54,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch WhatsApp.')));
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch WhatsApp.')));
+      }
     }
   }
 
@@ -59,7 +68,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.customer.name),
-            if (widget.customer.phone.isNotEmpty) Text(widget.customer.phone, style: const TextStyle(fontSize: 14.0, fontWeight: FontWeight.normal)),
+            if (widget.customer.phone.isNotEmpty)
+              Text(
+                widget.customer.phone,
+                style: const TextStyle(fontSize: 14.0, fontWeight: FontWeight.normal),
+              ),
           ],
         ),
       ),
@@ -105,7 +118,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       margin: const EdgeInsets.symmetric(vertical: 8.0),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
                       child: InkWell(
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddEditVehicleScreen(customerId: widget.customer.id, vehicle: vehicle))),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddEditVehicleScreen(customer: widget.customer, vehicle: vehicle))),
                         borderRadius: BorderRadius.circular(12.0),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -150,7 +163,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddEditVehicleScreen(customerId: widget.customer.id))),
+        onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddEditVehicleScreen(customer: widget.customer))),
         icon: const Icon(Icons.add),
         label: const Text('Add Vehicle'),
       ),

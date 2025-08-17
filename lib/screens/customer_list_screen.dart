@@ -1,7 +1,9 @@
 // lib/screens/customer_list_screen.dart
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart'; // NEW: Import package
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:intl/intl.dart';
 import '../models/customer_model.dart';
+import '../models/vehicle_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import 'add_customer_screen.dart';
@@ -23,37 +25,29 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   String _searchQuery = '';
   String? _currentUserRole;
 
-  // NEW: Ad State Variables
   BannerAd? _bannerAd;
   bool _isBannerAdReady = false;
 
   @override
   void initState() {
     super.initState();
-    _loadBannerAd(); // Load the ad
+    _loadBannerAd();
     _fetchUserRole();
     _searchController.addListener(() {
       if (mounted) setState(() => _searchQuery = _searchController.text);
     });
   }
   
-  // NEW: Function to load the banner ad
   void _loadBannerAd() {
-    // IMPORTANT: Replace this with your own Ad Unit ID from AdMob
     final adUnitId = 'ca-app-pub-7451304293352412/2801466658';
-
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
       request: const AdRequest(),
       size: AdSize.banner,
       listener: BannerAdListener(
-        onAdLoaded: (_) {
-          setState(() {
-            _isBannerAdReady = true;
-          });
-        },
+        onAdLoaded: (_) => setState(() => _isBannerAdReady = true),
         onAdFailedToLoad: (ad, err) {
-          print('Failed to load a banner ad: ${err.message}');
+          print('BannerAd failed to load: $err');
           _isBannerAdReady = false;
           ad.dispose();
         },
@@ -72,7 +66,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _bannerAd?.dispose(); // UPDATED: Dispose the ad
+    _bannerAd?.dispose();
     super.dispose();
   }
   
@@ -105,7 +99,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Customers'),
+        title: const Text('RenewRight'),
         actions: [
           if (_currentUserRole == 'admin')
             IconButton(
@@ -143,55 +137,108 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             ),
           ),
           Expanded(
-            child: StreamBuilder<List<Customer>>(
-              stream: _firestoreService.getCustomers(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-                if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('No customers found. Tap "+" to add one.', style: TextStyle(fontSize: 18, color: Colors.grey)));
-
-                List<Customer> customers = snapshot.data!;
-                if (_searchQuery.isNotEmpty) {
-                  customers = customers.where((c) {
-                    final query = _searchQuery.toLowerCase();
-                    return c.name.toLowerCase().contains(query) || c.phone.toLowerCase().contains(query);
-                  }).toList();
-                }
-
-                if (customers.isEmpty) return const Center(child: Text('No customers match your search.', style: TextStyle(fontSize: 16, color: Colors.grey)));
-
-                return ListView.builder(
-                  itemCount: customers.length,
-                  itemBuilder: (context, index) {
-                    final customer = customers[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                      child: ListTile(
-                        leading: CircleAvatar(child: Text(customer.name.substring(0, 1).toUpperCase())),
-                        title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(customer.phone),
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VehicleListScreen(customer: customer))),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddCustomerScreen(customer: customer)));
-                            } else if (value == 'delete') {
-                              _showDeleteConfirmation(customer);
-                            }
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
+                    child: Text('Due in 10 Days', style: Theme.of(context).textTheme.titleLarge),
+                  ),
+                ),
+                StreamBuilder<List<Vehicle>>(
+                  stream: _firestoreService.getUrgentRenewals(days: 10),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SliverToBoxAdapter(child: SizedBox.shrink());
+                    }
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const SliverToBoxAdapter(child: Card(margin: EdgeInsets.symmetric(horizontal: 16), child: ListTile(title: Text('No renewals due in the next 10 days.'))));
+                    }
+                    final urgentVehicles = snapshot.data!;
+                    return SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: 120,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                          itemCount: urgentVehicles.length,
+                          itemBuilder: (context, index) {
+                            final vehicle = urgentVehicles[index];
+                            final daysLeft = vehicle.dueDate.difference(DateTime.now()).inDays + 1;
+                            return Card(
+                              color: Colors.orange.shade50,
+                              child: Container(
+                                width: 220,
+                                padding: const EdgeInsets.all(12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(vehicle.customerName, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                    Text(vehicle.vehicleNumber),
+                                    const Spacer(),
+                                    Text('$daysLeft day${daysLeft > 1 ? 's' : ''} left', style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            );
                           },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 20), SizedBox(width: 8), Text('Edit')])),
-                            const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 20), SizedBox(width: 8), Text('Delete')])),
-                          ],
                         ),
                       ),
                     );
                   },
-                );
-              },
+                ),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 8.0),
+                    child: Text('All Customers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                StreamBuilder<List<Customer>>(
+                  stream: _firestoreService.getCustomers(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) return const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.all(32.0), child: CircularProgressIndicator())));
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) return const SliverToBoxAdapter(child: Center(child: Text('No customers found.')));
+                    
+                    List<Customer> customers = snapshot.data!;
+                    if (_searchQuery.isNotEmpty) {
+                      customers = customers.where((c) => c.name.toLowerCase().contains(_searchQuery.toLowerCase()) || c.phone.contains(_searchQuery)).toList();
+                    }
+
+                    if(customers.isEmpty) return const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text('No customers match your search.'))));
+
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final customer = customers[index];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                            child: ListTile(
+                              leading: CircleAvatar(child: Text(customer.name.substring(0, 1).toUpperCase())),
+                              title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(customer.phone),
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VehicleListScreen(customer: customer))),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddCustomerScreen(customer: customer)));
+                                  else if (value == 'delete') _showDeleteConfirmation(customer);
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 20), SizedBox(width: 8), Text('Edit')])),
+                                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 20), SizedBox(width: 8), Text('Delete')])),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        childCount: customers.length,
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-          // NEW: Ad container at the bottom
           if (_isBannerAdReady)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
